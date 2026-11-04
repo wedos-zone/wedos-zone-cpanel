@@ -1,0 +1,32 @@
+WEDOS.zone plugin
+Copyright (c) 2026 WEDOS Internet, a.s. All rights reserved.
+
+
+Disclaimer of warranty and limitation of liability
+
+The WEDOS.zone plugin is provided "as is" and "as available", without warranty of
+any kind, express or implied, including but not limited to warranties of
+merchantability, fitness for a particular purpose and non-infringement. WEDOS
+Internet, a.s. does not warrant that the plugin will be error-free, uninterrupted
+or compatible with every server configuration or panel version.
+
+The plugin changes the DNS configuration of the server it is installed on. You
+install and use it at your own risk. Before installing it, back up your server
+configuration and DNS zones, and test the plugin on one server before deploying it
+more widely.
+
+To the maximum extent permitted by applicable law, WEDOS Internet, a.s. shall not
+be liable for any direct, indirect, incidental or consequential damages, including
+loss of data, loss of DNS resolution, service interruption or loss of profit,
+arising from the installation or use of the plugin or the inability to use it.
+Nothing in this notice limits liability that cannot be limited under applicable
+law, such as liability for damage caused intentionally or through gross negligence.
+
+The DNS service provided through WEDOS.zone is governed by the WEDOS terms and
+conditions that apply to your account. The plugin itself is not licensed for
+redistribution or modification. All rights reserved.
+
+
+Trademarks
+
+cPanel® and WHM® are trademarks of WebPros International LLC.
