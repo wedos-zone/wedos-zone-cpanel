@@ -47,16 +47,19 @@ TCP and UDP port 53 through as well**. The plugin cannot see the firewall.
 
 ## Install
 
-Copy `wedos_zone-cpanel.tar.gz` and `SHA256SUMS.txt` to the server. As root, check
-that the archive arrived intact, then install:
+As root on the server, download the latest release, check that it arrived intact, then
+install:
 
 ```
-sha256sum -c SHA256SUMS.txt
+curl -fsSLO https://github.com/wedos-zone/wedos-zone-cpanel/releases/latest/download/wedos_zone-cpanel.tar.gz
+curl -fsSLO https://github.com/wedos-zone/wedos-zone-cpanel/releases/latest/download/wedos_zone-cpanel.tar.gz.sha256
+sha256sum -c wedos_zone-cpanel.tar.gz.sha256
 tar xzf wedos_zone-cpanel.tar.gz && sh wedos_zone/cpanel/scripts/install.sh
 ```
 
-The first command must print `wedos_zone-cpanel.tar.gz: OK`. If it does not, do not
-install — download the archive again.
+The check must print `wedos_zone-cpanel.tar.gz: OK`. If it does not, do not install —
+download the archive again. All releases are at
+https://github.com/wedos-zone/wedos-zone-cpanel/releases.
 
 Then in WHM open **Plugins → WEDOS**:
 
@@ -93,6 +96,22 @@ your own cluster nodes, your own transfer rules — keeps working as before.
 Files: the plugin in `/usr/local/cpanel/3rdparty/wedos_zone`, its data (settings, queue,
 log) in `/var/lib/wedos_zone`. The plugin runs on cPanel's own PHP, so changes to the PHP
 your websites use do not affect it.
+
+### Moving from your own scripts
+
+If you already create secondary zones at WEDOS with your own WAPI scripts, the plugin
+takes over from them. Nothing has to be deleted or created again.
+
+1. Install the plugin and fill in the same WAPI account your scripts use. Zones belong to
+   the account; with a different one the plugin reports them as held by another account.
+2. While test mode is still on, run `wz.php reconcile`. It only compares and changes
+   nothing. A zone on both sides is taken as it is. A zone only on this server would be
+   created. A zone only at WEDOS is only reported, never deleted, so zones of your other
+   servers on the same account are safe.
+3. Zones that already exist keep the primary IP your scripts set. If it was this
+   server's address, there is nothing to do. The plugin does not rewrite it.
+4. Switch your scripts off, then turn off test mode and tick **Report zone changes to
+   WEDOS.zone**. Two tools adding and removing the same zones would undo each other.
 
 ---
 
@@ -144,7 +163,7 @@ domain's zone in cPanel:
 These records get a 300-second TTL so that switching off is quick. The domain has to be
 delegated to the WEDOS nameservers (or your branded ones), otherwise WEDOS cannot verify
 it and the plugin tells you so. Finish any change to the domain's nameservers before you
-switch protection on: WEDOS checks the domain in intervals of about an hour and a half,
+switch protection on: WEDOS checks the domain at intervals that can be a few hours long,
 so a check that catches the change halfway delays switching on until the next one.
 
 **Switching off** puts the original records back first and cancels the service only
@@ -161,6 +180,21 @@ the service keeps running.
 that the zone of every protected domain still carries the proxy records. If the apex
 or `www` was changed, the Protection tab says so; the service is not cancelled.
 
+**Where the proxy sends visitors.** When protection is switched on, the plugin gives
+WEDOS the public IPv4 and IPv6 addresses of the apex and `www` from the zone as the
+origin. Addresses of WEDOS.protection itself and private addresses are left out: the
+proxy cannot reach them. If no address is left, protection is not switched on and the
+Protection tab says why. Each protected domain shows its origin.
+
+**After moving an account or changing the server IP, change the origin yourself.** The
+proxy keeps sending visitors to the address it got when protection was switched on.
+Once a day the plugin compares it with the IP that cPanel uses for the domain. When they
+differ, the Protection tab shows both addresses and you get a notification. The plugin
+cannot change the origin for you, because WAPI cannot. Change the target IP of the
+protection in the WEDOS administration, then click **Target changed** (or run
+`wz.php protection origin <domain>`). Only IPv4 is compared. Domains whose service was
+not created by the plugin show no origin and are not checked.
+
 **Before you switch protection off, make sure AutoSSL covers the domain.** While the
 domain is protected, WEDOS serves the certificate. After switching off, visitors get
 whatever certificate your server has — if AutoSSL is disabled or the domain is excluded
@@ -172,6 +206,24 @@ Wildcard certificates (`*.domain`) cannot be issued by AutoSSL for a domain serv
 WEDOS: AutoSSL checks its DNS record immediately, and the change takes several minutes
 to reach the WEDOS nameservers. Individual names (`www`, `mail`, …) are validated over
 HTTP and work.
+
+### Your own protection hostname (WhiteLabel CNAME)
+
+With WhiteLabel CNAME, `www` of a protected domain points to a name of yours instead of
+`<domain>.wedos.global`. WEDOS gives you the protection IP addresses; then:
+
+1. In your own zone, add one wildcard record for a name of your choice, for example
+   `*.proxy.example.com` → your protection IPv4 addresses (`A`) and IPv6 addresses
+   (`AAAA`). Put **nothing else** under `proxy.example.com`: any other record there stops
+   the wildcard from answering for that part of the name.
+2. In **Settings → Protection hostname**, enter `proxy.example.com` and save. The plugin
+   checks that a random name under it leads to WEDOS.protection and refuses to save it
+   otherwise.
+
+From then on, every domain you switch on gets `www` → `<domain>.proxy.example.com`.
+Domains that are already protected keep their records until protection is switched off
+and on again. The apex and `_acme-challenge` records are set as before. Empty the field
+to go back to the WEDOS name.
 
 ---
 
@@ -225,25 +277,29 @@ You can turn analytics back on in WHM → Server Configuration → Configure cPa
 
 ## Updating
 
-**From the plugin page (version 0.1.4 and later).** Once a day the plugin checks
-`https://wedos.zone/plugins/cpanel/version.txt`. When a newer version is out, the plugin
-page in WHM says so and offers **Update**. The click only queues the update: within a
+**From the plugin page (version 0.1.5 and later).** Once a day the plugin checks the
+latest release on GitHub (`github.com/wedos-zone/wedos-zone-cpanel`). When a newer
+version is out, the plugin page in WHM says so and offers **Update**. The click only queues the update: within a
 minute the cron downloads the package, verifies its signature, runs the installer and
 writes the result to the log. Nothing is installed without the click. A package whose
 signature does not match is refused and the installed version keeps running.
 
-The server needs outgoing HTTPS to `wedos.zone`. From the command line:
+The server needs outgoing HTTPS to `github.com` and `release-assets.githubusercontent.com`.
+From the command line:
 
 ```
 /usr/local/cpanel/3rdparty/bin/php /usr/local/cpanel/3rdparty/wedos_zone/scripts/wz.php update --install
 ```
 
-**By hand.** Run the install command with the new archive. Version 0.1.3 and older
+**By hand.** Run the install commands from *Install* again. Version 0.1.4 and older
 update only this way.
 
 Either way, settings, the queue and the zone memory live in `/var/lib/wedos_zone` and
 survive the update untouched. If a cPanel update ever removes something the plugin
 needs, the same command puts it back.
+
+What changed in each version is in `CHANGELOG.md` next to this file, and with every
+release on https://github.com/wedos-zone/wedos-zone-cpanel/releases.
 
 
 ## Removing
@@ -279,11 +335,36 @@ $PHP $WZ update [--install]         check for a new version, install it
 
 ---
 
+## The log
+
+Everything the plugin does goes to `/var/lib/wedos_zone/wedos_zone.log`, one line per
+event, with the level `INFO`, `WARN` or `ERROR`. The log records what was sent and what
+came back; it never contains your password.
+
+Follow it live:
+
+```bash
+tail -F /var/lib/wedos_zone/wedos_zone.log
+```
+
+Only warnings and errors, live or from the whole file:
+
+```bash
+tail -F /var/lib/wedos_zone/wedos_zone.log | grep --line-buffered -E ' (WARN|ERROR) '
+grep -E ' (WARN|ERROR) ' /var/lib/wedos_zone/wedos_zone.log
+```
+
+Use `-F`, not `-f`. At 5 MB the log is renamed to `wedos_zone.log.1` and a new one starts;
+`-F` follows the new file, `-f` would stay on the old one.
+
+In WHM, Settings shows the end of the log, with *show only those* when there are warnings.
+
+---
+
 ## Getting help
 
 Include the output of `wz.php status` and the last lines of
-`/var/lib/wedos_zone/wedos_zone.log`. The log records what was sent and what came back;
-it never contains your password.
+`/var/lib/wedos_zone/wedos_zone.log`.
 
 ---
 
